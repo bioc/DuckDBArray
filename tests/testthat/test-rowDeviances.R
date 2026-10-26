@@ -186,6 +186,23 @@ test_that("rowDeviances preserves row names", {
     expect_null(names(dev_nonames))
 })
 
+test_that("rowDeviances poisson handles a non-canonical dgCMatrix with an explicitly stored zero", {
+    # A dgCMatrix is not required to be drop0()'d; an explicitly stored zero
+    # must not be treated differently from an absent (implicit) zero.
+    explicit <- Matrix::sparseMatrix(i = c(1L, 2L, 1L, 2L), j = c(1L, 1L, 2L, 2L),
+                                     x = c(0, 4, 3, 1), dims = c(2L, 2L))
+    implicit <- Matrix::drop0(explicit)
+    expect_identical(as.matrix(explicit), as.matrix(implicit))
+
+    dev_explicit <- rowDeviances(explicit, family = "poisson")
+    dev_implicit <- rowDeviances(implicit, family = "poisson")
+    dev_dense <- rowDeviances(as.matrix(explicit), family = "poisson")
+
+    expect_equal(dev_explicit, dev_implicit, tolerance = 1e-10)
+    expect_equal(dev_explicit, dev_dense, tolerance = 1e-10)
+    expect_equal(unname(dev_explicit[[1]]), 6 * log(2), tolerance = 1e-10)
+})
+
 test_that("rowDeviances family argument works correctly", {
     mat <- matrix(rpois(100, 10), nrow = 10, ncol = 10)
 

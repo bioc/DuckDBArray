@@ -90,7 +90,11 @@ setGeneric("rowDeviances", function(x, family = c("binomial", "poisson"), ...)
         x <- as(x, "dgCMatrix")
         col_idx <- rep(seq_len(ncol(x)), diff(x@p))
         # Compute v * log(v / sz[j]) for each non-zero v
-        x@x <- x@x * log(x@x / sz[col_idx])
+        # Guard explicitly against stored zeros
+        stored <- x@x != 0
+        contrib <- numeric(length(x@x))
+        contrib[stored] <- x@x[stored] * log(x@x[stored] / sz[col_idx[stored]])
+        x@x <- contrib
         Matrix::rowSums(x)
     }
 }

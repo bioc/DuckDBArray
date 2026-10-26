@@ -1,3 +1,30 @@
+# DuckDBArray 0.99.12
+
+## Bug fixes
+
+- `rowDeviances(x, family = "poisson")`'s sparse path (`.poissonDevianceBlock`,
+  `rowDeviances.R`) computed `v * log(v / sz[j])` directly on a `dgCMatrix`'s
+  stored values with no zero guard, unlike the dense path three lines above
+  it (`ratio[x == 0] <- 1  # so log(1) = 0`). A `dgCMatrix` is not required to
+  be `drop0()`'d; an explicitly stored zero hit this unguarded branch as
+  `log(0) = -Inf`, so `0 * -Inf = NaN`, which then propagated through
+  `rowSums` into that gene's deviance and was silently zeroed by the
+  function's own `dev[is.na(dev)] <- 0` cleanup, reporting a plausible-looking
+  `0` instead of the correct value. Found while checking BiocDuckDB against
+  an independently discovered deviance bug of the same shape in an unrelated
+  codebase (stored zeros/saturated counts silently returning 0 instead of the
+  correct likelihood). The production `DuckDBMatrix` method was never
+  affected: its generated SQL already guards both families with
+  `if (value > 0) ... else 0`, so it never evaluates `log(0)`. Only an
+  in-memory `dgCMatrix` with an explicitly stored zero (never produced by
+  `as(x, "dgCMatrix")` from a dense matrix, but not excluded by the class
+  itself) could trigger this. A swept check of every other sparse/dense
+  statistical computation in the BiocDuckDB suite (`scran.R`, `scuttle.R`,
+  the matrix-stats files) found no other instance of this pattern; it is an
+  isolated case, not a systemic one, since `rowDeviances.R` is the only file
+  in the suite that does manual arithmetic on a `dgCMatrix`'s stored-value
+  slot rather than pushing the computation down as SQL.
+
 # DuckDBArray 0.99.11
 
 ## Bug fixes
